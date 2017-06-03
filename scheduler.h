@@ -14,7 +14,9 @@ class Scheduler
 {
 public:
   Scheduler();
-  void scheduleFor(const std::chrono::milliseconds& ms,
+
+  template <typename T>
+  void scheduleFor(const T& duration,
                    const std::function<void()>& fn);
 
 private:
@@ -54,4 +56,9 @@ private:
   RequestQueue  d_requestQueue;
 };
 
-
+template <typename T>
+void Scheduler::scheduleFor(const T& duration,
+                            const std::function<void()>& fn)
+{
+  d_requestQueue.add({Clock::now() + duration, fn});
+}

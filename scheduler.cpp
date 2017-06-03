@@ -46,12 +46,6 @@ Scheduler::Clock::duration Scheduler::getWaitTime()
     return d_scheduledEvents.top().first - Clock::now();
 }
 
-void Scheduler::scheduleFor(const std::chrono::milliseconds& ms,
-                            const std::function<void()>& fn)
-{
-  d_requestQueue.add({Clock::now() + ms, fn});
-}
-
 void Scheduler::dispatch()
 {
   while (true) {
