@@ -1,10 +1,12 @@
 #include <iostream>
 #include <chrono>
 #include <random>
+#include <cstdlib>
 
 #include <scheduler.h>
 
 using Clock = std::chrono::high_resolution_clock;
+using Precision = std::chrono::microseconds;
 
 void event(const std::string& message,
            const Clock::time_point& expected)
@@ -13,10 +15,10 @@ void event(const std::string& message,
   static int diffs;
   
   const auto tDiff = Clock::now() - expected;
-  const auto microSeconds = std::chrono::duration_cast<std::chrono::microseconds>(tDiff).count();
+  const auto microSeconds = std::chrono::duration_cast<Precision>(tDiff).count();
 
   count += 1;
-  diffs += microSeconds;
+  diffs += abs(microSeconds);
     
   std::cout << message
             << " (delay="

@@ -1,5 +1,7 @@
 #include <scheduler.h>
 
+#include <thread>
+
 bool Scheduler::Cmp::operator()(const ScheduledEvent& lhs,
                                 const ScheduledEvent& rhs) const
 {
@@ -9,19 +11,18 @@ bool Scheduler::Cmp::operator()(const ScheduledEvent& lhs,
 Scheduler::Scheduler()
   : d_scheduledEvents()
 {
-  d_dispatcher = std::thread(&Scheduler::dispatch, this);
-  d_dispatcher.detach();  
+  auto t = std::thread(&Scheduler::dispatch, this);
+  t.detach();  
 }
 
 bool Scheduler::RequestQueue::waitFor(ScheduledEvent* event,
                                       const Precision& t)
 {
   std::unique_lock<std::mutex> l(d_queueMutex);
-  const auto rc = d_isNotEmpty.wait_for(l, t,
-                                        [this](){
-                                          return !d_queue.empty();
-                                        });
-  if (!rc) {
+  if (!d_isNotEmpty.wait_for(l, t,
+                             [this](){
+                               return !d_queue.empty();
+                             })) {
     return false;
   }
   
@@ -52,12 +53,12 @@ void Scheduler::dispatch()
     auto waitTime = std::chrono::duration_cast<Precision>(getWaitTime());
     ScheduledEvent event;
     const auto rc = d_requestQueue.waitFor(&event, waitTime);
+
+    std::lock_guard<std::mutex> lock(d_scheduledMutex);
     if (rc) {
-      std::lock_guard<std::mutex> lock(d_scheduledMutex);
       d_scheduledEvents.push(event);
     }
     else {      
-      std::lock_guard<std::mutex> lock(d_scheduledMutex);
       // may have timed out in the waitFor(...) call.
       if (!d_scheduledEvents.empty()) {
         d_scheduledEvents.top().second();

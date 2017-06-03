@@ -1,6 +1,5 @@
 #pragma once
 
-#include <thread>
 #include <mutex>
 #include <condition_variable>
 
@@ -49,7 +48,6 @@ private:
   Clock::duration getWaitTime();
   
   // DATA
-  std::thread   d_dispatcher;
   std::mutex    d_scheduledMutex;
   ScheduleQueue d_scheduledEvents;
   RequestQueue  d_requestQueue;
