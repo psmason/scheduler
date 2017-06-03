@@ -13,8 +13,8 @@ Scheduler::Scheduler()
   d_dispatcher.detach();  
 }
 
-bool Scheduler::RequestQueue::waitFor(Event* event,
-                                      const std::chrono::milliseconds& t)
+bool Scheduler::RequestQueue::waitFor(ScheduledEvent* event,
+                                      const Precision& t)
 {
   std::unique_lock<std::mutex> l(d_queueMutex);
   const auto rc = d_isNotEmpty.wait_for(l, t,
@@ -30,7 +30,7 @@ bool Scheduler::RequestQueue::waitFor(Event* event,
   return true;
 }
 
-void Scheduler::RequestQueue::add(const Event& event)
+void Scheduler::RequestQueue::add(const ScheduledEvent& event)
 {
   std::unique_lock<std::mutex> l(d_queueMutex);
   d_queue.push_back(event);

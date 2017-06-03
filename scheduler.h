@@ -35,14 +35,13 @@ private:
                                              Cmp>;
 
   struct RequestQueue {
-    using Event = Scheduler::ScheduledEvent;
-    std::deque<Event>       d_queue;
-    std::mutex              d_queueMutex;
-    std::condition_variable d_isNotEmpty;
+    std::deque<ScheduledEvent> d_queue;
+    std::mutex                 d_queueMutex;
+    std::condition_variable    d_isNotEmpty;
 
-    bool waitFor(Event* event,
-                 const std::chrono::milliseconds& t);
-    void add(const Event& event);
+    bool waitFor(ScheduledEvent* event,
+                 const Precision& t);
+    void add(const ScheduledEvent& event);
   };
   
   // METHODS
