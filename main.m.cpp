@@ -55,7 +55,8 @@ void scheduleRandomly(Scheduler<PRECISION>& scheduler)
 }
            
 int main() {
-  Scheduler<std::chrono::milliseconds> scheduler;
+  using Precision = std::chrono::milliseconds;
+  Scheduler<Precision> scheduler;
 
   schedule(scheduler, "hello, world (immediate)", std::chrono::microseconds(-404));
   schedule(scheduler, "hello, world", std::chrono::milliseconds(171));
@@ -63,7 +64,7 @@ int main() {
   schedule(scheduler, "hello, world (final)", std::chrono::seconds(21));
 
   for (int i=0; i<4; ++i) {
-    std::thread t(scheduleRandomly<std::chrono::milliseconds>,
+    std::thread t(scheduleRandomly<Precision>,
                   std::ref(scheduler));
     t.detach();
   }
