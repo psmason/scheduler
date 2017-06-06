@@ -43,10 +43,9 @@ private:
   
   // METHODS
   void dispatch();
-  Clock::duration getWaitTime();
   
   // DATA
-  std::mutex              d_scheduledMutex;
+  std::mutex              d_mutex;
   std::condition_variable d_newWaitTime;
   ScheduleQueue           d_scheduledEvents;
 };
@@ -56,7 +55,7 @@ template <typename T>
 void Scheduler<PRECISION>::scheduleFor(const T& duration,
                                        const std::function<void()>& fn)
 {
-   std::lock_guard<std::mutex> lock(d_scheduledMutex);
+   std::lock_guard<std::mutex> lock(d_mutex);
    const auto scheduledFor = Clock::now() + duration;
    d_scheduledEvents.push({scheduledFor, fn});
    if (scheduledFor <= d_scheduledEvents.top().first) {
@@ -83,7 +82,7 @@ template <typename PRECISION>
 void Scheduler<PRECISION>::dispatch()
 {
   while (true) {
-    std::unique_lock<std::mutex> lock(d_scheduledMutex);
+    std::unique_lock<std::mutex> lock(d_mutex);
     if (d_scheduledEvents.empty()) {
       d_newWaitTime.wait(lock,
                          [this](){
