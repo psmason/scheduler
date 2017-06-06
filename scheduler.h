@@ -8,6 +8,7 @@
 #include <chrono>
 #include <vector>
 #include <deque>
+#include <algorithm>
 
 /*
   PRECISION describes the granularity of scheduled events. 
@@ -39,25 +40,15 @@ private:
   using ScheduleQueue  = std::priority_queue<ScheduledEvent,
                                              std::vector<ScheduledEvent>,
                                              Cmp>;
-
-  struct RequestQueue {
-    std::deque<ScheduledEvent> d_queue;
-    std::mutex                 d_queueMutex;
-    std::condition_variable    d_isNotEmpty;
-
-    bool waitFor(ScheduledEvent* event,
-                 const PRECISION& t);
-    void add(const ScheduledEvent& event);
-  };
   
   // METHODS
   void dispatch();
   Clock::duration getWaitTime();
   
   // DATA
-  std::mutex    d_scheduledMutex;
-  ScheduleQueue d_scheduledEvents;
-  RequestQueue  d_requestQueue;
+  std::mutex              d_scheduledMutex;
+  std::condition_variable d_newWaitTime;
+  ScheduleQueue           d_scheduledEvents;
 };
 
 template <typename PRECISION>
@@ -65,7 +56,12 @@ template <typename T>
 void Scheduler<PRECISION>::scheduleFor(const T& duration,
                                        const std::function<void()>& fn)
 {
-  d_requestQueue.add({Clock::now() + duration, fn});
+   std::lock_guard<std::mutex> lock(d_scheduledMutex);
+   const auto scheduledFor = Clock::now() + duration;
+   d_scheduledEvents.push({scheduledFor, fn});
+   if (scheduledFor <= d_scheduledEvents.top().first) {
+     d_newWaitTime.notify_one();
+   }
 }
 
 template <typename PRECISION>
@@ -84,58 +80,28 @@ Scheduler<PRECISION>::Scheduler()
 }
 
 template <typename PRECISION>
-bool Scheduler<PRECISION>::RequestQueue::waitFor(ScheduledEvent* event,
-                                                 const PRECISION& t)
-{
-  std::unique_lock<std::mutex> l(d_queueMutex);
-  if (!d_isNotEmpty.wait_for(l, t,
-                             [this](){
-                               return !d_queue.empty();
-                             })) {
-    return false;
-  }
-  
-  *event = d_queue.front();
-  d_queue.pop_front();
-  return true;
-}
-
-template <typename PRECISION>
-void Scheduler<PRECISION>::RequestQueue::add(const ScheduledEvent& event)
-{
-  std::unique_lock<std::mutex> l(d_queueMutex);
-  d_queue.push_back(event);
-  d_isNotEmpty.notify_one();
-}
-
-template <typename PRECISION>
-Scheduler<PRECISION>::Clock::duration Scheduler<PRECISION>::getWaitTime()
-{
-    std::lock_guard<std::mutex> lock(d_scheduledMutex);
-    if (d_scheduledEvents.empty()) {
-      return std::chrono::seconds(10);
-    }
-    return d_scheduledEvents.top().first - Clock::now();
-}
-
-template <typename PRECISION>
 void Scheduler<PRECISION>::dispatch()
 {
   while (true) {
-    auto waitTime = std::chrono::duration_cast<PRECISION>(getWaitTime());
-    ScheduledEvent event;
-    const auto rc = d_requestQueue.waitFor(&event, waitTime);
-
-    std::lock_guard<std::mutex> lock(d_scheduledMutex);
-    if (rc) {
-      d_scheduledEvents.push(event);
+    std::unique_lock<std::mutex> lock(d_scheduledMutex);
+    if (d_scheduledEvents.empty()) {
+      d_newWaitTime.wait(lock,
+                         [this](){
+                           return !d_scheduledEvents.empty();
+                         });
     }
-    else {      
-      // may have timed out in the waitFor(...) call.
-      if (!d_scheduledEvents.empty()) {
-        d_scheduledEvents.top().second();
-        d_scheduledEvents.pop();
+    else {
+      while (Clock::now() < d_scheduledEvents.top().first) {
+        const auto tDiff = d_scheduledEvents.top().first - Clock::now();
+        d_newWaitTime.wait_for(lock,
+                               std::max(PRECISION(1), // minimum sleep time
+                                        std::chrono::duration_cast<PRECISION>(tDiff)));
       }
+
+      const auto event = d_scheduledEvents.top();
+      d_scheduledEvents.pop();
+      lock.unlock();
+      event.second(); // invoking callback
     }
-  }
+  }    
 }
