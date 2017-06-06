@@ -1,7 +1,6 @@
 #include <iostream>
 #include <chrono>
 #include <random>
-#include <cstdlib>
 #include <thread>
 
 #include <scheduler.h>
@@ -19,7 +18,7 @@ void event(const std::string& message,
   const auto microSeconds = std::chrono::duration_cast<ReportingPrecision>(tDiff).count();
 
   count += 1;
-  diffs += abs(microSeconds);
+  diffs += microSeconds;
     
   std::cout << message
             << " (delay="
@@ -55,7 +54,7 @@ void scheduleRandomly(Scheduler<PRECISION>& scheduler)
 }
            
 int main() {
-  using Precision = std::chrono::milliseconds;
+  using Precision = std::chrono::seconds;
   Scheduler<Precision> scheduler;
 
   schedule(scheduler, "hello, world (immediate)", std::chrono::microseconds(-404));

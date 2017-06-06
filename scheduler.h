@@ -92,9 +92,14 @@ void Scheduler<PRECISION>::dispatch()
     else {
       while (Clock::now() < d_scheduledEvents.top().first) {
         const auto tDiff = d_scheduledEvents.top().first - Clock::now();
-        d_newWaitTime.wait_for(lock,
-                               std::max(PRECISION(1), // minimum sleep time
-                                        std::chrono::duration_cast<PRECISION>(tDiff)));
+
+        // rounding up
+        auto waitTime = std::chrono::duration_cast<PRECISION>(tDiff);
+        if (waitTime < tDiff) {
+          waitTime = waitTime + PRECISION(1);
+        }
+        
+        d_newWaitTime.wait_for(lock, waitTime);
       }
 
       const auto event = d_scheduledEvents.top();
